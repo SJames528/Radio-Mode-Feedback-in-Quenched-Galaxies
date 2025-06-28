@@ -21,6 +21,7 @@ def pixel_to_snapshot(coord, mosaic, size):
     x_cut = np.array([row[int(nearest_pix[0]+1-(size/2)):int(nearest_pix[0]+1+(size/2))] for row in y_cut])
     return x_cut
 
+#calculate the RA/DEC range for the current mosaic
 def mosaic_dim_limits(mos):
     head_ = mos[0].header
     ra_min = mos[0].header["CRVAL1"] + mos[0].header["CRPIX1"]*mos[0].header["CDELT1"]
@@ -29,6 +30,7 @@ def mosaic_dim_limits(mos):
     dec_max = mos[0].header["CRVAL2"] + mos[0].header["CRPIX2"]*mos[0].header["CDELT2"]
     return ra_min, ra_max, dec_min, dec_max
 
+#plot the image data for all catalogue points in the current mosaic
 def visualise(df, mos, s=10, fig_size=(10,10)):
     coord_sys = WCS(mos[0].header)
     ra_min, ra_max, dec_min, dec_max = mosaic_dim_limits(mos)
