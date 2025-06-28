@@ -5,4 +5,4 @@ The aim of this project is to test for the presence of radio-mode feedback in qu
 As a rough plan for the project, I am to:
   - Infer a catalogue of quenched galaxies from the SFR and galaxy masses
   - Match these quenched galaxies to radio sources in the LoLSS survey
-  - Using the complementary subset to the above (quenched galaxies which are *not* identified radio sources), determine if there is collective evidence for radio signals from these galaxies, against survey noise. To achieve this, I am to use stacking analysis to average the signals from the ~15000 sources, and use Monte Carlo simulation to obtain estimates for baseline noise and error in the survey.
+  - Using the complementary subset to the above (quenched galaxies which are *not* identified radio sources), determine if there is collective evidence for radio signals from these galaxies, against survey noise. To achieve this, I aim to use stacking analysis to average the signals from the ~15000 sources, and use Monte Carlo simulation to obtain estimates for baseline noise and error in the survey.
