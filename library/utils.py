@@ -31,16 +31,16 @@ def mosaic_dim_limits(mos):
     return ra_min, ra_max, dec_min, dec_max
 
 #plot the image data for all catalogue points in the current mosaic
-def visualise(df, mos, s=5, fig_size=(10,10), coord_names=["RA","DEC"], ret_snapshot_info=False):
+def visualise(df, mos, s=5, fig_size=(10,10), coord_names=["RA","DEC"], ret_snap_info=False):
     
-    """Produce images from a given mosaic centred at points in a dataframe. The function will select only those objects within the mosaic's (assuemd square) field, so the dataframe need not be pre-processed to contain only relevant sources. Size of regions and fig sizes can be specified. Coord names are assumed to be "RA" and "DEC", but these can be specified. Can optionally return the image data in an array rather than plotting.
+    """Produce images from a given mosaic centred at points in a dataframe. The function will select only those objects within the mosaic's (assumed square) field, so the dataframe need not be pre-processed to contain only relevant sources. Size of regions and fig sizes can be specified. Coord names are assumed to be "RA" and "DEC", but these can be specified. Can optionally return the image data in an array rather than plotting.
 
     :param df: dataframe - the dataframe containing catalogue points to display. Columns for right ascension (RA) and declination (DEC) are required, but other contents are not required.
     :param mos: mosaic object - usually loaded in from a fits mosaic with fits.open(file). Mosaic is assumed to be square (that is, all objects within the RA and DEC bounds will attemt to be plotted.
     :param s: int - size of the region (s x s square) to display, with the object position at the centre pixel, or above-left of centre in the case of even integer s value. Default value s=5.
     :param fig_size: (int, int) tuple - the size of the subplots (matplotlib.pyplot) for the returned images. Default value fig_size=(10, 10).
     :param coord_names: [str, str] list - the column names for RA and DEC respectively in the provided dataframe. Default value coord_names=["RA","DEC"].
-    :param ret_snapshot_info: bool - if True, function will forgo displaying the image data, and instead return the data in a numpy array. Default value ret_snapshot_info=False.
+    :param ret_snap_info: bool - if True, function will forego displaying the image data, and instead return the data in a numpy array. Default value ret_snap_info=False.
     """
     
     coord_sys = WCS(mos[0].header)
@@ -51,11 +51,12 @@ def visualise(df, mos, s=5, fig_size=(10,10), coord_names=["RA","DEC"], ret_snap
     ret = []
     for index, point in enumerate(points):
         ax[index//2,index%2].imshow(pixel_to_snapshot(point, mos, s),cmap='gray')
-        if ret_snapshot_info:
+        if ret_snap_info:
             ret.append(pixel_to_snapshot(point, mos, s))
         ax[index//2,index%2].set_axis_off()
     if len(pixs)%2: ax[-1,-1].axis('off')
-    if ret_snapshot_info:
+    if ret_snap_info:
+        plt.close()
         return np.array(ret)
     plt.show()
         
