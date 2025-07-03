@@ -1,5 +1,6 @@
 from astropy.io import fits
 from astropy.wcs import WCS
+from astropy.table import Table
 import astropy
 import pandas as pd
 import numpy as np
@@ -9,12 +10,24 @@ data_folder = "~/Cardiff/Summer Project/data/"
 
 ##read in matched catalogue
 matched_catalogue = fits.open(data_folder + 'matched_lofar_sdss')
-mat_cat_df = pd.DataFrame(matched_catalogue[1].data)
+mat_cat_df = Table(matched_catalogue[1].data).to_pandas()
 
 ##read in mosaic
-#mosaic = fits.open(data_folder+'/mosaics/p164+47-mosaic.fits')
-#mosaic = fits.open(data_folder+'/mosaics/p176+60-mosaic.fits')
-mosaic = fits.open(data_folder+'/mosaics/p169+55-mosaic.fits')
+mosaic = fits.open(data_folder+'/mosaics/p164+47-mosaic.fits')
+mosaic = fits.open(data_folder+'/mosaics/p176+60-mosaic.fits')
+#mosaic = fits.open(data_folder+'/mosaics/p169+55-mosaic.fits')
 
 ##visualise all points in the DF which coincide with the selected mosaic
-visualise(mat_cat_df, mosaic, s=2)
+#visualise(mat_cat_df, mosaic, s=50, coord_names=["RA_1","DEC_1"])
+
+##Read in entire quenched catalogue
+quenched_cat = fits.open(data_folder + 'SDSS_quenched_in_skyarea')
+quenched_df = Table(quenched_cat[1].data).to_pandas().drop(columns = ["Source_S"])
+quenched_df["combined_coord"] = [item for item in zip(quenched_df["RA"],quenched_df["DEC"])]
+
+##Keep record of matched radio objects
+SDSS_matched_coords = [item for item in zip(mat_cat_df["RA_2"],mat_cat_df["DEC_2"])]
+
+##Retain only quenched sources which are not radio sources
+quenched_no_radio_df = quenched_df[~quenched_df["combined_coord"].isin(SDSS_matched_coords)]
+visualise(quenched_no_radio_df[:1000], mosaic, s=50)
