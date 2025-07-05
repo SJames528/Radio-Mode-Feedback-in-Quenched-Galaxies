@@ -17,7 +17,7 @@ mat_cat_df = Table(matched_catalogue[1].data).to_pandas()
 #mosaic = fits.open(data_folder+'/mosaics/p176+60-mosaic.fits')
 mosaic = fits.open(data_folder+'/mosaics/p169+55-mosaic.fits')
 
-##visualise all points in the DF which coincide with the selected mosaic
+##visualise all points in the DF which lie within the selected mosaic
 #visualise(mat_cat_df, mosaic, s=50, coord_names=["RA_1","DEC_1"])
 
 ##Read in entire quenched catalogue

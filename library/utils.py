@@ -12,15 +12,21 @@ def df_coords_to_pixels(df, coord_system, coord_names):
         output.append(coord_system.world_to_pixel(astropy.coordinates.SkyCoord(skypoint[0],skypoint[1],unit="deg")))
     return output
 
+def pad_square(array, central_pixel, snap_size, pad_with=0):
+    #pad horizontal
+    if array.shape[0] < snap_size:
+
+    #pad vertical
+    if array.shape[1] < snap_size:
+        
+    return array
+
 #takes a pixel position and returns a region of pixels around that central position
 def pixel_to_snapshot(coord, mosaic, size):
     nearest_pix = [int(np.round(a)) for a in coord]
     image_data = mosaic[0].data
     y_dim, x_dim = image_data.shape
-    y_cut = image_data[int(nearest_pix[1]+1-(size/2)):int(nearest_pix[1]+1+(size/2))]
-    x_cut = np.array([row[int(nearest_pix[0]+1-(size/2)):int(nearest_pix[0]+1+(size/2))] for row in y_cut])
-
-    df_cut = np.array(image_data[int(nearest_pix[1]+1-(size/2)):int(nearest_pix[1]+1+(size/2)), int(nearest_pix[0]+1-(size/2)):int(nearest_pix[0]+1+(size/2))])
+    df_cut = np.array(image_data[np.max(int(nearest_pix[1]+1-(size/2)),0):int(nearest_pix[1]+1+(size/2)), np.max(int(nearest_pix[0]+1-(size/2)),0):int(nearest_pix[0]+1+(size/2))])
     return df_cut
 
 #calculate the RA/DEC range for the current mosaic
