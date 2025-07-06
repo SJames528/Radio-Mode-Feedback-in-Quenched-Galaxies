@@ -12,21 +12,56 @@ def df_coords_to_pixels(df, coord_system, coord_names):
         output.append(coord_system.world_to_pixel(astropy.coordinates.SkyCoord(skypoint[0],skypoint[1],unit="deg")))
     return output
 
-def pad_square(array, central_pixel, snap_size, pad_with=0):
-    #pad horizontal
-    if array.shape[0] < snap_size:
+#takes an array and pads until a certain pixel is in the centre
+# # Deprecated, as functionality has been incorporated into pixel_to_snapshot(). Keeping for other projects # #
+def pad_square(array, central_pixel, pad_with=0):
+    as_list = array.tolist()
+    
+    space_left = central_pixel[1]
+    space_right = array.shape[1] - central_pixel[1] - 1
+    space_up = central_pixel[0]
+    space_down = array.shape[0] - central_pixel[0] - 1
 
-    #pad vertical
-    if array.shape[1] < snap_size:
-        
-    return array
+    #horizontal padding
+    left_padding = np.max(space_right-space_left,0) * [pad_with]
+    right_padding = np.max(space_left-space_right,0) * [pad_with]
+    for row_idx in range(len(as_list)):
+        as_list[row_idx] = left_padding + as_list[row_idx] + right_padding
+
+    #vertical padding
+    up_padding = np.max(space_down-space_up,0) * [len(as_list[0]) * [pad_with]]
+    down_padding = np.max(space_up-space_down,0) * [len(as_list[0]) * [pad_with]]
+    as_list = up_padding + as_list + down_padding
+
+    return np.array(as_list)
 
 #takes a pixel position and returns a region of pixels around that central position
-def pixel_to_snapshot(coord, mosaic, size):
+def pixel_to_snapshot(coord, mosaic, size, pad=True):
+    if not (size % 2):
+        raise Exception("Image size must be odd integer")
     nearest_pix = [int(np.round(a)) for a in coord]
     image_data = mosaic[0].data
     y_dim, x_dim = image_data.shape
-    df_cut = np.array(image_data[np.max(int(nearest_pix[1]+1-(size/2)),0):int(nearest_pix[1]+1+(size/2)), np.max(int(nearest_pix[0]+1-(size/2)),0):int(nearest_pix[0]+1+(size/2))])
+
+    left_cutoff = int(nearest_pix[1]-((size-1)/2))
+    right_cutoff = int(nearest_pix[1]+((size+1)/2))
+    up_cutoff = int(nearest_pix[0]-((size-1)/2))
+    down_cutoff = int(nearest_pix[0]+((size+1)/2))
+
+    df_cut = np.array(image_data[max(left_cutoff,0):right_cutoff, max(up_cutoff,0):down_cutoff])
+
+    if pad and df_cut.shape != (size,size):
+        df_cut_list = df_cut.tolist()
+        left_padding = max(0-left_cutoff,0) * [0]
+        right_padding = max(right_cutoff-x_dim,0) * [0]
+        up_padding = max(0-up_cutoff,0) * [size * [0]]
+        down_padding = max(down_cutoff-y_dim,0) * [size * [0]]
+
+        for row_idx in range(len(df_cut_list)):
+            df_cut_list[row_idx] = left_padding + df_cut_list[row_idx] + right_padding
+        df_cut_list = up_padding + df_cut_list + down_padding
+        df_cut = np.array(df_cut_list)
+    
     return df_cut
 
 #calculate the RA/DEC range for the current mosaic

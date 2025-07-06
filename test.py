@@ -18,7 +18,7 @@ mat_cat_df = Table(matched_catalogue[1].data).to_pandas()
 mosaic = fits.open(data_folder+'/mosaics/p169+55-mosaic.fits')
 
 ##visualise all points in the DF which lie within the selected mosaic
-#visualise(mat_cat_df, mosaic, s=50, coord_names=["RA_1","DEC_1"])
+vis_data = visualise(mat_cat_df, mosaic, s=15, coord_names=["RA_1","DEC_1"], ret_snap_info=True)
 
 ##Read in entire quenched catalogue
 quenched_cat = fits.open(data_folder + 'SDSS_quenched_in_skyarea')
