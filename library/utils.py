@@ -45,19 +45,19 @@ def pixel_to_snapshot(coord, mosaic, s, pad=True):
     image_data = mosaic[0].data
     y_dim, x_dim = image_data.shape
 
-    left_cutoff = int(nearest_pix[1]-((s-1)/2))
-    right_cutoff = int(nearest_pix[1]+((s+1)/2))
-    up_cutoff = int(nearest_pix[0]-((s-1)/2))
-    down_cutoff = int(nearest_pix[0]+((s+1)/2))
+    left_cutoff = int(nearest_pix[0]-((s-1)/2))
+    right_cutoff = int(nearest_pix[0]+((s+1)/2))
+    up_cutoff = int(nearest_pix[1]-((s-1)/2))
+    down_cutoff = int(nearest_pix[1]+((s+1)/2))
 
-    df_cut = np.array(image_data[max(left_cutoff,0):right_cutoff, max(up_cutoff,0):down_cutoff])
+    df_cut = np.array(image_data[max(up_cutoff,0):down_cutoff, max(left_cutoff,0):right_cutoff])
 
     if pad and df_cut.shape != (s,s):
         df_cut_list = df_cut.tolist()
         left_padding = max(0-left_cutoff,0) * [0]
         right_padding = max(right_cutoff-x_dim,0) * [0]
-        up_padding = max(0-up_cutoff,0) * [size * [0]]
-        down_padding = max(down_cutoff-y_dim,0) * [size * [0]]
+        up_padding = max(0-up_cutoff,0) * [s * [0]]
+        down_padding = max(down_cutoff-y_dim,0) * [s * [0]]
 
         for row_idx in range(len(df_cut_list)):
             df_cut_list[row_idx] = left_padding + df_cut_list[row_idx] + right_padding
@@ -75,40 +75,54 @@ def mosaic_dim_limits(mos):
     dec_max = mos[0].header["CRVAL2"] + mos[0].header["CRPIX2"]*mos[0].header["CDELT2"]
     return ra_min, ra_max, dec_min, dec_max
 
+#produce plots of mosaic cutouts
+def visualise(arr, fig_size=(10,10)):
+    if len(arr)==0 or not isinstance(arr, (list,np.ndarray)):
+        raise Exception("Data empty, or not provided as list/array")
+    if len(arr.shape)==2:
+        plt.imshow(arr,cmap='grey')
+        plt.axis('off')
+    else:
+        fig, ax = plt.subplots(int(0.5+len(arr)/2),2,figsize=fig_size)
+        for index, cutout in enumerate(arr):
+            subfig = ax[index//2,index%2] if len(arr)>2 else ax[index%2]
+            subfig.imshow(cutout,cmap='gray')
+            subfig.set_axis_off()
+        if len(arr)%2:
+            ax[-1,-1].axis('off')
+    plt.show()
+
 #plot the image data for all catalogue points in the current mosaic
-def visualise(df, mos, s=5, fig_size=(10,10), coord_names=["RA","DEC"], ret_snap_info=False):
+def snapshots(df, mos, s=15, coord_names=["RA","DEC"], vis=False, vis_figsize=(10,10)):
     
-    """Produce images from a given mosaic centred at points in a dataframe. The function will select only those objects within the mosaic's (assumed square) field, so the dataframe need not be pre-processed to contain only relevant sources. Size of regions and fig sizes can be specified. Coord names are assumed to be "RA" and "DEC", but these can be specified. Can optionally return the image data in an array rather than plotting.
+    """Produces cutouts from a given mosaic centred at points given in a dataframe. The function will select only those objects within the mosaic's (assumed square) field, so the dataframe need not be pre-processed to contain only relevant sources. Size of cutout region can be specified. Coord names are assumed to be "RA" and "DEC", but these can be specified.
 
     :param df: dataframe OR list - the dataframe or list of tuples containing catalogue points to display. In the case of dataframe, columns for right ascension (RA) and declination (DEC) are required, but other contents are not required. If a list is entered, will be first converted to an appropriate dataframe.
     :param mos: mosaic object - usually loaded in from a fits mosaic with fits.open(file). Mosaic is assumed to be square (that is, all objects within the RA and DEC bounds will attemt to be plotted.
-    :param s: int - size of the region (s x s square) to display, with the object position at the centre pixel, or above-left of centre in the case of even integer s value. Default value s=5.
-    :param fig_size: (int, int) tuple - the size of the subplots (matplotlib.pyplot) for the returned images. Default value fig_size=(10, 10).
+    :param s: int - size of the region (s x s square) to display, with the object position at the centre pixel, or above-left of centre in the case of even integer s value. Default value s=15.
     :param coord_names: [str, str] list - the column names for RA and DEC respectively in the provided dataframe. Default value coord_names=["RA","DEC"].
-    :param ret_snap_info: bool - if True, function will forego displaying the image data, and instead return the data in a numpy array. Default value ret_snap_info=False.
     """
 
     if isinstance(df, list):
         df = pd.DataFrame(df)
         df.columns = coord_names
+        
     coord_sys = WCS(mos[0].header)
     ra_min, ra_max, dec_min, dec_max = mosaic_dim_limits(mos)
-    
     points = df[(ra_min<=df[coord_names[0]]) & (df[coord_names[0]]<=ra_max) & (dec_min<=df[coord_names[1]]) & (df[coord_names[1]]<=dec_max)].copy()
+    
     if len(points) == 0:
         raise Exception("Empty intersection with mosaic")
     points = df_coords_to_pixels(points, coord_sys, coord_names)
     
-    fig, ax = plt.subplots(int(0.5+len(points)/2),2,figsize=fig_size)
     ret = []
     for index, point in enumerate(points[["pix_x", "pix_y"]].values):
-        ax[index//2,index%2].imshow(pixel_to_snapshot(point, mos, s),cmap='gray')
-        if ret_snap_info:
-            ret.append(pixel_to_snapshot(point, mos, s))
-        ax[index//2,index%2].set_axis_off()
-    if len(points)%2: ax[-1,-1].axis('off')
-    if ret_snap_info:
-        plt.close()
-        return np.array(ret)
-    plt.show()
-        
+        ret.append(pixel_to_snapshot(point, mos, s))
+    ret = np.array(ret)
+
+    if vis: visualise(ret, figsize = vis_figsize)
+    return ret
+
+def stack(cutout_arr, weight_method):
+    
+    return
