@@ -49,7 +49,19 @@ mosaic_1 = fits.open(data_folder+'/mosaics/p164+47-mosaic.fits')
 mosaic_2 = fits.open(data_folder+'/mosaics/p176+60-mosaic.fits')
 mosaic_3 = fits.open(data_folder+'/mosaics/p169+55-mosaic.fits')
 
-for index, mat in enumerate(snap_info_quiet):
+for index, mat in enumerate(snap_data(snap_info_quiet)):
+    if not index:
+        avg_snap = mat
+    else:
+        avg_snap += mat
+visualise(avg_snap)
+
+problematic_snaps = snap_info_quiet[[np.max(i) > 0.1 for i in snap_info_quiet["snapshot"]]]
+visualise(problematic_snaps)
+
+unproblematic_snaps = snap_info_quiet.drop(problematic_snaps.index)
+
+for index, mat in enumerate(snap_data(unproblematic_snaps)):
     if not index:
         avg_snap = mat
     else:

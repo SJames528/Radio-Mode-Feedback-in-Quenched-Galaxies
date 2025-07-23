@@ -5,6 +5,9 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
+def snap_data(df):
+    return np.array([i for i in df["snapshot"]])
+
 #takes a dataframe of points and returns an array of their pixel positions
 def df_coords_to_pixels(df, coord_system, coord_names, new_names=["pix_x","pix_y"]):
     pix_coords = []
@@ -77,8 +80,12 @@ def mosaic_dim_limits(mos):
 
 #produce plots of mosaic cutouts
 def visualise(arr, fig_size=(10,10)):
+    if isinstance(arr, pd.core.frame.DataFrame):
+        arr = np.array(arr["snapshot"])
     if len(arr)==0 or not isinstance(arr, (list,np.ndarray)):
         raise Exception("Data empty, or not provided as list/array")
+    while arr.shape[0]==1:
+        arr = arr[0]
     if len(arr.shape)==2:
         plt.imshow(arr,cmap='grey')
         plt.axis('off')
@@ -116,12 +123,12 @@ def snapshots(df, mos, s=15, coord_names=["RA","DEC"], vis=False, vis_figsize=(1
     points = df_coords_to_pixels(points, coord_sys, coord_names)
     
     ret = []
-    for index, point in enumerate(points[["pix_x", "pix_y"]].values):
+    for point in points[["pix_x", "pix_y"]].values:
         ret.append(pixel_to_snapshot(point, mos, s))
-    ret = np.array(ret)
+    points["snapshot"] = ret
 
-    if vis: visualise(ret, figsize = vis_figsize)
-    return ret
+    if vis: visualise(points, figsize = vis_figsize)
+    return points
 
 def stack(cutout_arr, weight_method):
     
