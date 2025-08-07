@@ -18,6 +18,11 @@ mosaic_small = fits.open(data_folder+'/mosaics/p164+47-mosaic.fits')
 #mosaic = fits.open(data_folder+'/mosaics/p169+55-mosaic.fits')
 mosaic = fits.open(data_folder+'/mosaics/mosaic-i_1.fits')
 mosaic2 = fits.open(data_folder+'/mosaics/mosaic-i_2.fits')
+mosaic_lr = fits.open(data_folder+'/mosaics/mosaic-lr.fits')
+
+mosaic_active = [mosaic, mosaic2]
+#mosaic_active = mosaic_lr
+global_size = 25
 
 ##visualise all points in the DF which lie within the selected mosaic
 #vis_data = snapshots(mat_cat_df, mosaic, s=15, coord_names=["RA_1","DEC_1"])
@@ -35,16 +40,24 @@ SDSS_matched_coords = [item for item in zip(mat_cat_df["RA_2"],mat_cat_df["DEC_2
 quenched_no_radio_df = quenched_df[~quenched_df["combined_coord"].isin(SDSS_matched_coords)]
 quenched_no_radio_df = quenched_no_radio_df.drop(columns=["combined_coord"])
 
-snap_info_quiet = snapshots(quenched_no_radio_df, [mosaic, mosaic2], s=25)
-snap_info_loud = snapshots(mat_cat_df, [mosaic, mosaic2], s=25, coord_names=["RA_1","DEC_1"])
+snap_info_quiet = snapshots(quenched_no_radio_df, mosaic_active, s=global_size)
+snap_info_loud = snapshots(mat_cat_df, mosaic_active, s=global_size, coord_names=["RA_1","DEC_1"])
+
+##Mean/std per cutout
+if False:
+    std_list = np.array([np.mean(cutout) for cutout in snap_data(snap_info_quiet)])
+    plt.hist(std_list, bins=bins, log=True); plt.title("Histogram of mean cutout values over entire catalogue")
+    plt.xlabel("Mean flux (Jy/beam)"); plt.ylabel("Logged count")
+    plt.show()
+
 
 ##See what stacking looks like on radio-loud galaxies, as an example of a positive result
-if False:
+if True:
     stack_loud = stack(snap_info_loud)
-    visualise(stack_loud)
+    visualise(stack_loud, title="stacking analysis on radio-loud data")
 
 ##Plot some histograms of typical snapshot pixel values
-if False:
+if True:
     fig, ax = plt.subplots(2,1,figsize=(10,10))
     ax[0].hist(snap_data(snap_info_quiet[:100]).flatten(), bins=np.linspace(np.min(snap_data(snap_info_loud)), np.max(snap_data(snap_info_loud)), 50), log=True)
     ax[0].set_title("Histogram of pixel values for first 100 radio-quiet quenched galaxies"); ax[0].set_xlabel("Pixel value"); ax[0].set_ylabel("Count")
@@ -70,11 +83,14 @@ if False:
 
 
 ##2 - Some snapshots contain bright radio sources. These should in theory be dealt with by the variance weighting when stacking, but better safe than sorry.
-mid_vals = snap_info_quiet[[0.03<np.max(i)<0.04 for i in snap_data(snap_info_quiet)]]
-if False:
+if True:
+    max
+    cutouts_with_large_vals = snap_info_quiet[[0.03<np.max(i)<0.04 for i in snap_data(snap_info_quiet)]]
+    mid_vals = snap_info_quiet[[0.03<np.max(i)<0.04 for i in snap_data(snap_info_quiet)]]
     visualise(mid_vals[:10], title="")
-problematic_snaps = snap_info_quiet[[np.max(i) > 0.03 for i in snap_data(snap_info_quiet)]]
-snap_info_quiet = snap_info_quiet.drop(problematic_snaps.index)
+if False:
+    problematic_snaps = snap_info_quiet[[np.max(i) > 0.03 for i in snap_data(snap_info_quiet)]]
+    snap_info_quiet = snap_info_quiet.drop(problematic_snaps.index)
 
 ##3 - Some snapshots have naturally higher baseline signal (due to being too close to bright sources or other noise artifacts). Need some way to subtract the baseline, or remove those with high median values
 if False:
@@ -101,7 +117,7 @@ while len(random_coord_dict['RA'])<len(snap_info_quiet):
         random_coord_dict['DEC'].append(new_rand_point[1])
 random_coord_df = pd.DataFrame(random_coord_dict)
 
-random_coord_snaps = snapshots(random_coord_df, [mosaic,mosaic2], s=25)
+random_coord_snaps = snapshots(random_coord_df, mosaic_active, s=global_size)
 #Visual of duplicated region:
 if True:
     dup_points = random_coord_snaps[random_coord_snaps.index.duplicated(keep=False)]
@@ -118,7 +134,7 @@ visualise(random_coord_stack, title="Stacked random points in the mosaics")
 rng = np.random.default_rng()
 len_random = 100
 if False:
-    random_snapshots = np.array([random_stack(rng, [mosaic,mosaic2], len_=len(snap_info_quiet)) for i in range(len_random)])
+    random_snapshots = np.array([random_stack(rng, mosaic_active, len_=len(snap_info_quiet)) for i in range(len_random)])
     with open("100_random_stacks.npy", 'wb') as f:
         np.save(f, random_snapshots)
 else:  
@@ -137,12 +153,21 @@ if False:
     plt.show()
 
 ##Angular separation analysis
-#add column for skycoord() for each object
-#snap_info_quiet["RA"]-snap_info_quiet["RA"].loc[0]
-#keep only less than mod 1
-#search skycoord.separation() over remaining
-#save lowest number
-#repeat over set
+snap_info_quiet = snap_info_quiet.sort_index()
+ang_sep_l = []
+for i in snap_info_quiet.index:
+    nearby = snap_info_quiet[(np.abs(snap_info_quiet["RA"]-snap_info_quiet["RA"][i])<1)&(np.abs(snap_info_quiet["DEC"]-snap_info_quiet["DEC"][i])<1)].drop([i])
+    ang_sep = np.min(np.array([snap_info_quiet.loc[i]["skycoord"].separation(nearby_point).arcsecond for nearby_point in nearby["skycoord"]]))
+    ang_sep_l.append(ang_sep)
+snap_info_quiet["closest_angsep_arc"] = ang_sep_l
 
+#!! there are 788 instances of exactly matching objects
+non_overlapping_points = snap_info_quiet[snap_info_quiet["closest_angsep_arc"]!=0]
+#!! there are 82 instances where the separation is less than 15" FWHM
+
+
+snap_info_quiet = snap_info_quiet[snap_info_quiet["closest_angsep_arc"]>15]
+
+#!! there are 355 instances where the separation is less than the size of a cutout
 
 

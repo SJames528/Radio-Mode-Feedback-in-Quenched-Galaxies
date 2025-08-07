@@ -9,14 +9,18 @@ def snap_data(df):
     return np.array([i for i in df["snapshot"]])
 
 #takes a dataframe of points and adds new columns with their pixel positions
-def df_coords_to_pixels(df, coord_system, coord_names, new_names=["pix_x","pix_y"]):
-    pix_coords = [coord_system.world_to_pixel(astropy.coordinates.SkyCoord(skypoint[0],skypoint[1],unit="deg")) for skypoint in df[coord_names].values]
-    df.loc[:,new_names[0]] = [i[0] for i in pix_coords]
-    df.loc[:,new_names[1]] = [i[1] for i in pix_coords] 
+def df_skycoords_to_pixels(df, mos, coord_system):
+    mos_pointer = mos
+    pix_coords = [coord_system.world_to_pixel(skypoint) for skypoint in df["skycoord"].values]
+    df.loc[:,"mosaic_coord"] = [(mos_pointer, coords) for coords in pix_coords]
+    return df
+
+def df_add_skycoords(df, coord_names):
+    df.loc[:,"skycoord"] = [astropy.coordinates.SkyCoord(skypoint[0],skypoint[1],unit="deg") for skypoint in df[coord_names].values]
     return df
 
 #takes an array and pads until a certain pixel is in the centre
-# # Deprecated, as functionality has been incorporated into pixel_to_snapshot(). Keeping for other projects # #
+# # DEPRECATED, as functionality has been incorporated into pixel_to_snapshot(). Keeping for other projects # #
 def pad_square(array, central_pixel, pad_with=0):
     as_list = array.tolist()
     
@@ -39,7 +43,8 @@ def pad_square(array, central_pixel, pad_with=0):
     return np.array(as_list)
 
 #takes a pixel position and returns a region of pixels around that central position
-def pixel_to_snapshot(coord, mosaic, s, pad=True):
+def pixel_to_snapshot(mos_coord, s, pad=True):
+    mosaic, coord = mos_coord
     if not (s % 2):
         raise Exception("Image size must be odd integer")
     nearest_pix = [int(np.round(a)) for a in coord]
@@ -69,19 +74,10 @@ def pixel_to_snapshot(coord, mosaic, s, pad=True):
     
     return df_cut
 
-#calculate the RA/DEC range for the current mosaic (assumed square)
-def mosaic_dim_limits(mos):
-    head_ = mos[0].header
-    ra_min = head_["CRVAL1"] + (head_["NAXIS1"]-head_["CRPIX1"])*head_["CDELT1"]
-    ra_max = head_["CRVAL1"] - head_["CRPIX1"]*head_["CDELT1"]
-    dec_min = head_["CRVAL2"] - head_["CRPIX2"]*head_["CDELT2"]
-    dec_max = head_["CRVAL2"] + (head_["NAXIS2"]-head_["CRPIX2"])*head_["CDELT2"]
-    return ra_min, ra_max, dec_min, dec_max
-
 #produce plots of mosaic cutouts
 def visualise(arr, title="", fig_size=(10,10)):
     if isinstance(arr, pd.core.frame.DataFrame):
-        arr = np.array(arr['snapshot'])
+        arr = snap_data(arr)
     if len(arr)==0 or not isinstance(arr, (list,np.ndarray,pd.core.series.Series)):
         raise Exception("Data empty, or not provided as list/array")
     while arr.shape[0]==1:
@@ -104,7 +100,7 @@ def visualise(arr, title="", fig_size=(10,10)):
     plt.show()
 
 #plot the image data for all catalogue points in the current mosaic
-def snapshots(df, mosaics, s=15, coord_names=["RA","DEC"], vis=False, vis_figsize=(10,10)):
+def snapshots(df, mosaics, s=25, coord_names=["RA","DEC"], vis=False, vis_figsize=(10,10)):
     
     """Produces cutouts from a given mosaic centred at points given in a dataframe. The function will select only those objects within the mosaic's (assumed square) field, so the dataframe need not be pre-processed to contain only relevant sources. Size of cutout region can be specified. Coord names are assumed to be "RA" and "DEC", but these can be specified.
 
@@ -119,25 +115,23 @@ def snapshots(df, mosaics, s=15, coord_names=["RA","DEC"], vis=False, vis_figsiz
     if isinstance(mosaics, astropy.io.fits.hdu.hdulist.HDUList):
         mosaics = [mosaics]
 
+    df = df_add_skycoords(df, coord_names)
     ret = pd.DataFrame([])
     for mos in mosaics:
         coord_sys = WCS(mos[0].header)
-        #ra_min, ra_max, dec_min, dec_max = mosaic_dim_limits(mos)
-        if not all([a in df.columns for a in ["pix_x", "pix_y"]]):
-            points = df_coords_to_pixels(df.copy(), coord_sys, coord_names)
-            points = points[((0<=points["pix_x"])&(points["pix_x"]<coord_sys.pixel_shape[0]))&((0<=points["pix_y"])&(points["pix_y"]<coord_sys.pixel_shape[1]))]
-
-            if len(points) == 0:
-                ## TODO: fix when exception is raised when passing only one point but multiple mosaics, since there is a mosaic which it isn't part of.
-                raise Exception("Empty intersection with mosaic")
-            points = df_coords_to_pixels(points, coord_sys, coord_names)
+        if not "mosaic_coord" in df.columns:
+            points = df_skycoords_to_pixels(df.copy(), mos, coord_sys)
+            points = points[((0<=np.array([i[1][0] for i in points["mosaic_coord"]]))&(np.array([i[1][0] for i in points["mosaic_coord"]])<coord_sys.pixel_shape[0]))&((0<=np.array([i[1][1] for i in points["mosaic_coord"]]))&(np.array([i[1][1] for i in points["mosaic_coord"]])<coord_sys.pixel_shape[1]))]
         else:
             points = df.copy()
 
-        points["snapshot"] = [pixel_to_snapshot(point, mos, s) for point in points[["pix_x", "pix_y"]].values]
+        if len(points):
+            points["snapshot"] = [pixel_to_snapshot(mos_coord, s) for mos_coord in points["mosaic_coord"].values]
         
-        ret = pd.concat([ret,points])
-        
+            ret = pd.concat([ret,points])
+
+    if not len(ret):
+        raise Exception("Empty intersection with mosaic")
     ret = ret[np.array([not not np.count_nonzero(i) for i in ret["snapshot"]])]
 
     if vis: visualise(ret, figsize = vis_figsize)
@@ -175,6 +169,7 @@ def random_stack(rng, mos, len_, s=25):
             random_coord_dict['RA'].append(new_rand_point[0])
             random_coord_dict['DEC'].append(new_rand_point[1])
     random_coord_df = snapshots(pd.DataFrame(random_coord_dict), mos, s)
+    
     random_coord_df = random_coord_df[~random_coord_df.index.duplicated()]
     random_coord_stack = stack(random_coord_df)
     return random_coord_stack
