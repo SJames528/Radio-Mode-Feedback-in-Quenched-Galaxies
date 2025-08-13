@@ -143,11 +143,13 @@ def stack(df, weight_method="IVW"):
     for mat in snap_data(df):
         var = np.std(mat)**2
         if not var:
+            if avg_snap.shape == (1,1):
+                avg_snap += mat/len(df)
             continue
         weighted_cutout = mat/var
         avg_snap += weighted_cutout
         inv_var_sum += 1/var
-    return avg_snap/inv_var_sum
+    return avg_snap/inv_var_sum if inv_var_sum else avg_snap
 
 def skycoord_in_survey_region(point):
     ra, dec = point
@@ -171,5 +173,19 @@ def random_stack(rng, mos, len_, s=25):
     random_coord_df = snapshots(pd.DataFrame(random_coord_dict), mos, s)
     
     random_coord_df = random_coord_df[~random_coord_df.index.duplicated()]
-    random_coord_stack = stack(random_coord_df)
-    return random_coord_stack
+    return stack(random_coord_df)
+
+def prog_bar(i,n,bar_len=25):
+    progress = int(np.floor((i/n)*bar_len))
+    print("|"+"#"*progress+"_"*(bar_len-progress)+f"| Progress={i}/{n}", end='\r') if i!=n else print("|"+"#"*progress+"_"*(bar_len-progress)+f"| Progress={i}/{n}")
+
+def verbose_iterate_to_array(n=100,bar_len=25):
+    def decorator(func):
+        list_ = []
+        def wrapper(*args, **kwargs):
+            for i in range(1,n+1):
+                list_.append(func(*args, **kwargs))
+                prog_bar(i,n,bar_len)
+            return np.array(list_)
+        return wrapper
+    return decorator

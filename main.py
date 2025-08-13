@@ -52,12 +52,12 @@ if False:
 
 
 ##See what stacking looks like on radio-loud galaxies, as an example of a positive result
-if True:
+if False:
     stack_loud = stack(snap_info_loud)
     visualise(stack_loud, title="stacking analysis on radio-loud data")
 
 ##Plot some histograms of typical snapshot pixel values
-if True:
+if False:
     fig, ax = plt.subplots(2,1,figsize=(10,10))
     ax[0].hist(snap_data(snap_info_quiet[:100]).flatten(), bins=np.linspace(np.min(snap_data(snap_info_loud)), np.max(snap_data(snap_info_loud)), 50), log=True)
     ax[0].set_title("Histogram of pixel values for first 100 radio-quiet quenched galaxies"); ax[0].set_xlabel("Pixel value"); ax[0].set_ylabel("Count")
@@ -83,7 +83,7 @@ if False:
 
 
 ##2 - Some snapshots contain bright radio sources. These should in theory be dealt with by the variance weighting when stacking, but better safe than sorry.
-if True:
+if False:
     max
     cutouts_with_large_vals = snap_info_quiet[[0.03<np.max(i)<0.04 for i in snap_data(snap_info_quiet)]]
     mid_vals = snap_info_quiet[[0.03<np.max(i)<0.04 for i in snap_data(snap_info_quiet)]]
@@ -123,7 +123,7 @@ if True:
     dup_points = random_coord_snaps[random_coord_snaps.index.duplicated(keep=False)]
     plt.scatter(random_coord_snaps["RA"], random_coord_snaps["DEC"], s=2)
     plt.scatter(dup_points["RA"], dup_points["DEC"], s=2)
-    plt.title("Mosaic overlap region - points in the intersection have two distinct data cutouts available")
+    plt.title("Mosaic overlap region - points in the intersection\nhave two distinct data cutouts available")
     plt.show()
 
 random_coord_snaps = random_coord_snaps[~random_coord_snaps.index.duplicated()]
@@ -131,14 +131,17 @@ random_coord_stack = stack(random_coord_snaps)
 visualise(random_coord_stack, title="Stacked random points in the mosaics")
 
 ##100 stacked cutouts of random populations:
+@verbose_iterate_to_array(n=1000)
+def random_iterated_stack(*args,**kwargs):
+    return random_stack(*args,**kwargs)
+
 rng = np.random.default_rng()
-len_random = 100
-if False:
-    random_snapshots = np.array([random_stack(rng, mosaic_active, len_=len(snap_info_quiet)) for i in range(len_random)])
-    with open("100_random_stacks.npy", 'wb') as f:
+if True:
+    random_snapshots = random_iterated_stack(rng, mosaic_active, len_=len(snap_info_quiet), s=1)
+    with open("100_random_n_points.npy", 'wb') as f:
         np.save(f, random_snapshots)
 else:  
-    with open("100_random_stacks.npy", 'rb') as f:
+    with open("100_random_n_stacks.npy", 'rb') as f:
         random_snapshots = np.load(f)
 
 ##Histograms of pixel values:
@@ -153,21 +156,23 @@ if False:
     plt.show()
 
 ##Angular separation analysis
-snap_info_quiet = snap_info_quiet.sort_index()
-ang_sep_l = []
-for i in snap_info_quiet.index:
-    nearby = snap_info_quiet[(np.abs(snap_info_quiet["RA"]-snap_info_quiet["RA"][i])<1)&(np.abs(snap_info_quiet["DEC"]-snap_info_quiet["DEC"][i])<1)].drop([i])
-    ang_sep = np.min(np.array([snap_info_quiet.loc[i]["skycoord"].separation(nearby_point).arcsecond for nearby_point in nearby["skycoord"]]))
-    ang_sep_l.append(ang_sep)
-snap_info_quiet["closest_angsep_arc"] = ang_sep_l
 
-#!! there are 788 instances of exactly matching objects
-non_overlapping_points = snap_info_quiet[snap_info_quiet["closest_angsep_arc"]!=0]
-#!! there are 82 instances where the separation is less than 15" FWHM
+if True:
+    snap_info_quiet = snap_info_quiet.sort_index()
+    ang_sep_l = []
+    for i in snap_info_quiet.index:
+        nearby = snap_info_quiet[(np.abs(snap_info_quiet["RA"]-snap_info_quiet["RA"][i])<1)&(np.abs(snap_info_quiet["DEC"]-snap_info_quiet["DEC"][i])<1)].drop([i])
+        ang_sep = np.min(np.array([snap_info_quiet.loc[i]["skycoord"].separation(nearby_point).arcsecond for nearby_point in nearby["skycoord"]]))
+        ang_sep_l.append(ang_sep)
+    snap_info_quiet["closest_angsep_arc"] = ang_sep_l
+
+    #!! there are 788 instances of exactly matching objects
+    non_overlapping_points = snap_info_quiet[snap_info_quiet["closest_angsep_arc"]!=0]
+    #!! there are 82 instances where the separation is less than 15" FWHM
 
 
-snap_info_quiet = snap_info_quiet[snap_info_quiet["closest_angsep_arc"]>15]
+    snap_info_quiet = snap_info_quiet[snap_info_quiet["closest_angsep_arc"]>3]
 
-#!! there are 355 instances where the separation is less than the size of a cutout
+    #!! there are 355 instances where the separation is less than the size of a cutout
 
 
