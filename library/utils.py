@@ -75,7 +75,7 @@ def pixel_to_snapshot(mos_coord, s, pad=True):
     return df_cut
 
 #produce plots of mosaic cutouts
-def visualise(arr, title="", fig_size=(10,10)):
+def visualise(arr, title="", fig_size=(10,10), save=0):
     if isinstance(arr, pd.core.frame.DataFrame):
         arr = snap_data(arr)
     if len(arr)==0 or not isinstance(arr, (list,np.ndarray,pd.core.series.Series)):
@@ -97,6 +97,8 @@ def visualise(arr, title="", fig_size=(10,10)):
         if len(arr)%2:
             ax[-1,-1].axis('off')
         fig.suptitle(title)
+    if save:
+        plt.savefig(save)
     plt.show()
 
 #plot the image data for all catalogue points in the current mosaic
@@ -138,13 +140,14 @@ def snapshots(df, mosaics, s=25, coord_names=["RA","DEC"], vis=False, vis_figsiz
     return ret
 
 def stack(df, weight_method="IVW"):
-    avg_snap = np.zeros(snap_data(df)[0].shape)
+    data_ = snap_data(df)
+    avg_snap = np.zeros(data_[0].shape)
     inv_var_sum = 0
-    for mat in snap_data(df):
+    for mat in data_:
         var = np.std(mat)**2
         if not var:
-            if avg_snap.shape == (1,1):
-                avg_snap += mat/len(df)
+            if avg_snap.shape == () or avg_snap.shape[0]==1:
+                avg_snap += mat/len(data_)
             continue
         weighted_cutout = mat/var
         avg_snap += weighted_cutout
@@ -163,7 +166,7 @@ def skycoord_in_survey_region(point):
             (167.5<ra<170 and 48.5<dec<58.75) or
             (ra<167.5 and dec>48.5 and (9*dec<(22*ra)-3199)))
 
-def random_stack(rng, mos, len_, s=25):
+def random_stack(rng, mos, len_, s=25, stack=True):
     random_coord_dict = {'RA': [], 'DEC':[]}
     while len(random_coord_dict['RA'])<len_:
         new_rand_point = rng.random(2)*(75,15.25) + (162.5,46)
@@ -173,19 +176,20 @@ def random_stack(rng, mos, len_, s=25):
     random_coord_df = snapshots(pd.DataFrame(random_coord_dict), mos, s)
     
     random_coord_df = random_coord_df[~random_coord_df.index.duplicated()]
-    return stack(random_coord_df)
+    return stack(random_coord_df) if stack else random_coord_df
 
 def prog_bar(i,n,bar_len=25):
     progress = int(np.floor((i/n)*bar_len))
     print("|"+"#"*progress+"_"*(bar_len-progress)+f"| Progress={i}/{n}", end='\r') if i!=n else print("|"+"#"*progress+"_"*(bar_len-progress)+f"| Progress={i}/{n}")
 
-def verbose_iterate_to_array(n=100,bar_len=25):
+def verbose_iterate_to_array(n=100,bar_len=25,chunk=1):
     def decorator(func):
         list_ = []
         def wrapper(*args, **kwargs):
-            for i in range(1,n+1):
+            for i in range(1,int(n+1)):
                 list_.append(func(*args, **kwargs))
-                prog_bar(i,n,bar_len)
+                if not i%chunk:
+                    prog_bar(i,n,bar_len)
             return np.array(list_)
         return wrapper
     return decorator
